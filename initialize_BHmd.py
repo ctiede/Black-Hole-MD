@@ -39,29 +39,15 @@ def sphere_surf(n):
     points[:,2] = z
     return points
 
-def init_sphere(dim, nobj, x0, y0, z0, v):
-    #Takes dimensions, number of particles, an impact parameter b,
-    # the y-distance from the origin, and the y-velocity of the particles
-    if dim == 3:
-        points = sphere_surf(nobj)
-    elif dim == 2:
-        points = disk(nobj)
-    else:
-        print "Dimensions should be 2 or 3"
+def rand_sphere(n, R):
+    #Create array of distances
+    U = np.random.rand(n)
+    D = R*U**(1./3.)
+    #Uniform distribution on surface of sphere
+    points = sphere_surf(n)
 
-    velos = np.zeros((nobj, dim))
-    vy = v #np.sqrt(2)/2.0*v
-    vz = 0#-np.sqrt(2)/2.0*v
-    velos[:,1] = vy
-    velos[:,2] = vz
+    return D[:,None]*points
 
-    points[:,0] += x0
-    points[:,1] += y0
-    points[:,2] += z0
-
-    np.savetxt('init_pos.dat',points)
-    np.savetxt('init_vel.dat',velos)
-    return points, velos
 
 def init_disk(dim, nobj, rmin, rmax, theta):
     #Creates a Keplarian Disk out of the nobj bodies in dim dimensions
@@ -98,6 +84,35 @@ def init_disk(dim, nobj, rmin, rmax, theta):
 
     return pos, vel
 
+
+def init_star(dim, nobj, R, ecc):
+    #Takes dimensions, number of particles, an impact parameter b,
+    # the y-distance from the origin, and the y-velocity of the particles
+    if dim != 3:
+        print "Need to be in 3 dimensions"
+    points = rand_sphere(nobj,R)
+
+    fac=50.
+    x0 = (1+ecc)*fac
+    y0 = 0.
+    z0 = 0.
+    points[:,0] += x0
+    COM = np.array([x0,y0,z0])
+    #points[:,1] += y0
+    #points[:,2] += z0
+
+    #Init Velocities
+    velos = np.zeros((nobj, dim))
+    vy = np.sqrt( (1-ecc)/(1+ecc) ) / np.sqrt(fac)
+    velos[:,1] = vy
+
+    n_com = np.zeros((nobj, dim))
+    n_com[:,] = COM
+
+    np.savetxt('init_pos.dat',points)
+    np.savetxt('init_vel.dat',velos)
+    return points, velos, n_com
+
 def binary(dim):
     BHpos = np.zeros((2,dim))
     BHvel = np.zeros((2,dim))
@@ -109,15 +124,18 @@ def binary(dim):
 
 
 if __name__ == '__main__':
-    n = 1000
+    n = 5000
     b = 0
     rmin = 5
     rmax = 20
+    R = 0.1
+    ecc = 0.9
     x0 = 0
     y0 = 0
-    z0 = b
+    z0 = 0
 
-    points = init_disk(3, n, rmin, rmax, np.pi/6.)[0]
+    #points = init_disk(3, n, rmin, rmax, np.pi/6.)[0]
+    points = init_star(3,n,R,ecc)[0]
     x = points[:,0] + x0
     y = points[:,1] + y0
     z = points[:,2] + z0
