@@ -17,6 +17,7 @@ def BHmd_bin(dim, nobj, positions, velocities, steps, tau, fileName):
     pos = np.copy(positions)
     vel = np.copy(velocities)
     acc = np.zeros((nobj,dim))
+    N = nobj
 
     #Initialize Black Hole Bindary
     BHpos, BHvel = init.binary(dim)
@@ -25,12 +26,16 @@ def BHmd_bin(dim, nobj, positions, velocities, steps, tau, fileName):
     print_step = 25
     open(fileName, 'w').close() #clears the file if it exists already
     for step in range(0,steps+1):
+        #Update BH positions
         BHpos, BHvel, BHacc = BH_update(dim,BHpos, BHvel, BHacc, tau)
+        #Check if particles "too" close to BHs
+        N, pos, vel, acc = checkPos(N, BHpos, pos, vel, acc)
+        #Update particle positions
         pos, vel, acc = evolve(dim, nobj, BHpos, pos, vel, acc, tau)
 
         if (step+print_step) % print_step == 0:
             print step
-            dumpPos(BHpos, pos, step, fileName)
+            dumpPos(N, BHpos, pos, step, fileName)
             #dumpVel(vel, step)
             #dumpAcc(acc, step)
             #dump_BH(BHpos, step)
@@ -45,7 +50,7 @@ def compute_Fbin(dim, nobj, BHpos, pos0, vel0):
     r1 = np.sqrt(np.sum(dist1**2, axis=1))
     r2 = np.sqrt(np.sum(dist2**2, axis=1))
 
-    return -dist1/r1[:,None]**3 - dist2/r2[:,None]**3
+    return -0.5*dist1/r1[:,None]**3 - 0.5*dist2/r2[:,None]**3
 
 def computeBin(dim, pos0, vel0):
     pos = np.copy(pos0)
@@ -90,9 +95,35 @@ def evolve(dim, nobj, BHpos, pos0, vel0, acc0, tau):
 
     return pos, vel, acc
 
-def dumpPos(BHpos, pos, step, fileName):
+def checkPos(N, BHpos, pos0, vel0, acc0):
+    vel = np.copy(vel0)
+    pos = np.copy(pos0)
+    acc = np.copy(acc0)
+    bh1 = BHpos[0]
+    bh2 = BHpos[1]
+
+    cutoff = 0.1
+
+    dist1 = pos - bh1
+    dist2 = pos - bh2
+    r1 = np.sqrt(np.sum(dist1**2, axis=1))
+    r2 = np.sqrt(np.sum(dist2**2, axis=1))
+
+    mask = (r1<cutoff)|(r2<cutoff)
+    pos[mask] = np.NaN
+    vel[mask] = np.NaN
+    acc[mask] = np.NaN
+
+    Ndel = (r1<cutoff).sum() + (r2<cutoff).sum()
+    N = N - Ndel
+
+    return N, pos, vel, acc
+
+
+
+def dumpPos(N, BHpos, pos, step, fileName):
     f = open(fileName, 'a')
-    N = pos.shape[0]
+    #N = pos.shape[0]
     line = "{0:d} \nAtoms. Timestep: {1:g} \n".format(N+2,step)
     f.write(line)
 
@@ -127,12 +158,12 @@ def dump_BH(BHpos, step):
 if __name__ == '__main__':
     dim = 3
     nobj = 2000
-    steps = 25000
+    steps = 10000000
     dt = 0.01
 
     rmin = 2
     rmax = 20
-    theta = np.pi/6.
+    theta = np.pi/4.
     fileName = 'test_binDisk.xyz'
     pos, vel = init.init_disk(dim, nobj, rmin, rmax, theta)
 

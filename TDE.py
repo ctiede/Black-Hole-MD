@@ -6,7 +6,7 @@ import h5py
 import time
 import initialize_BHmd as init
 
-def BHmd(dim, nobj, COM, positions, velocities, M_BH, steps, tau, fileName):
+def BHmd(dim, nobj, COM, positions, velocities, M_BH, r_t, steps, tau, fileName):
     print "Black Hole MD Simulation"
     print 'Number of Objects:', nobj
     print 'Number of Timesteps:', steps
@@ -18,29 +18,45 @@ def BHmd(dim, nobj, COM, positions, velocities, M_BH, steps, tau, fileName):
     com = np.copy(COM)
     vel = np.copy(velocities)
     acc = np.zeros((nobj,dim))
+    N = nobj
 
-    r_t = 200*M_BH      #Tidal radius
+    #r_t = Q          #Tidal radius = (M_BH/M_*)^(1/3) * r_*
+    print "Tidal radius: ", r_t
+    print "Schw Radius: ", M_BH*2
+    print "COM Distance: "  ,np.sqrt(np.sum(com[0,]**2))
+    #time.sleep(10)
 
-    print_step = 50
+    print_step = 100
     count = 0
     open(fileName, 'w').close() #clears the file if it exists already
     for step in range(0,steps+1):
         com_dist = np.sqrt(np.sum(com[0,]**2))
+        #If outside the tidal radius evlolve all particles as COM
         if com_dist > r_t:
-            pos, vel, acc = evolve_bulk(dim, nobj, com, vel, acc, M_BH, tau)
+            pos, vel, acc, com = evolve_bulk(dim, nobj, com, pos, vel, acc, M_BH, tau)
+        #Once inside Tidal radius, evolve each individually
         else:
             if count == 0:
                 changeStep = step
+                com_pos = com[0]
+            #Check if particles "too" close to BHs--if inside r_s get discarded
+            N, pos, vel, acc = checkPos(N, pos, vel, acc, M_BH)
+            #Update Particle Positions
             pos, vel, acc = evolve(dim, nobj, pos, vel, acc, M_BH, tau)
             count = 1
 
         if (step+print_step) % print_step == 0:
             print step
-            dumpPos(pos, step, fileName)
-            dumpVel(vel, step)
-            dumpAcc(acc, step)
+            dumpPos(N, pos, step, fileName)
+            #dumpVel(vel, step)
+            #dumpAcc(acc, step)
 
-    print changeStep/print_step
+    #Create restart files
+    np.savetxt('./Restart/restart_pos.dat',pos)
+    np.savetxt('./Restart/restart_vel.dat',vel)
+
+    print count
+    print changeStep/print_step, com_pos
 
 def computeF(dim, nobj, pos0, vel0):
     pos = np.copy(pos0)
@@ -84,7 +100,7 @@ def evolve_bulk(dim, nobj, COM, pos0, vel0, acc0, M_BH, tau):
     #Velocity Verlet--first half
     vel = vel + 0.5*tau*acc
     pos = pos + tau*vel #+ 0.5*tau*tau*acc
-    com = com + tau*vel[0]
+    com = com + tau*vel
 
     #Compute accelerations from updated positions
     force = computeF_PW(dim, nobj, com, vel0, M_BH)
@@ -93,11 +109,44 @@ def evolve_bulk(dim, nobj, COM, pos0, vel0, acc0, M_BH, tau):
     #Velocity Verlet--Last Step: Get full step velocities
     vel = vel + 0.5*tau*acc
 
-    return pos, vel, acc
+    return pos, vel, acc, com
 
-def dumpPos(pos, step, fileName):
+def checkPos(N, pos0, vel0, acc0, M_BH):
+    vel = np.copy(vel0)
+    pos = np.copy(pos0)
+    acc = np.copy(acc0)
+    r_s = 2*M_BH
+
+    dist = np.sqrt(np.sum(pos**2, axis=1))
+
+    mask = (dist<r_s)
+    pos[mask] = np.NaN
+    vel[mask] = np.NaN
+    acc[mask] = np.NaN
+
+    Ndel = (dist < r_s).sum()
+    N = N - Ndel
+
+    return N, pos, vel, acc
+
+def calc_Periapse(Beta, R_T):
+    Beta = np.float(Beta)
+    R_T = np.float(R_T)
+    return R_T/Beta
+
+def calc_Apoapse(Beta, R_T, ecc):
+    Beta = np.float(Beta)
+    R_T = np.float(R_T)
+    ecc = np.float(ecc)
+
+    R_P = calc_Periapse(Beta, R_T)
+    fac = R_P/(1-ecc)
+
+    return fac*(1+ecc)
+
+def dumpPos(N, pos, step, fileName):
     f = open(fileName, 'a')
-    N = pos.shape[0]
+    #N = pos.shape[0]
     line = "{0:d} \nAtoms. Timestep: {1:g} \n".format(N+1,step)
     f.write(line)
 
@@ -153,11 +202,20 @@ if __name__ == '__main__':
     steps = 500000
     dt = 0.01
 
-    R=1
-    ecc = 0.9
-    r_g = 0.5
+    R=1                         #star radius
+    f = .5                     #r_star = f*r_schw
+    q = 100                     #(M_BH/M_star)^(1/3)
+    beta = 11.6              #Inverse impact parameter: r_t/r_p
+    ecc = 0.9                  #Eccentricity
+
+    r_g = 0.5/f                 #r_g = M_BH
+    r_t = q                     #tidal radius = (M_BH/M_star)^(1/3)
+    r_p = calc_Periapse(beta, r_t)   #Periapse
+    r_a = calc_Apoapse(beta, r_t, ecc)    #Apoapse
+    #rt_factor = 0.75            #semi-major axis = rt_factor * tidal radius
+
     fileName = 'test.xyz'
-    pos, vel, com = init.init_star(dim, nobj, R, ecc)
+    pos, vel, com = init.init_star_ellip(dim, nobj, R, ecc, beta, r_t)
 
 
-    BHmd(dim, nobj, com, pos, vel, r_g, steps, dt, fileName)
+    BHmd(dim, nobj, com, pos, vel, r_g, r_t, steps, dt, fileName)

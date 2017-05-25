@@ -39,6 +39,11 @@ def sphere_surf(n):
     points[:,2] = z
     return points
 
+def sphere_surf_rand(n):
+    R = np.random.rand(n,3)
+    r = np.sqrt(np.sum(R**2, axis=1))
+    return R/r[:,None]
+
 def rand_sphere(n, R):
     #Create array of distances
     U = np.random.rand(n)
@@ -85,15 +90,16 @@ def init_disk(dim, nobj, rmin, rmax, theta):
     return pos, vel
 
 
-def init_star(dim, nobj, R, ecc):
+def init_star_ellip(dim, nobj, R, ecc, beta, r_t):
     #Takes dimensions, number of particles, an impact parameter b,
     # the y-distance from the origin, and the y-velocity of the particles
     if dim != 3:
         print "Need to be in 3 dimensions"
     points = rand_sphere(nobj,R)
 
-    fac=50.
-    x0 = (1+ecc)*fac
+    #fac = Q*rt_factor
+    r_a, fac = calc_Apoapse(beta, r_t, ecc)
+    x0 = r_a
     y0 = 0.
     z0 = 0.
     points[:,0] += x0
@@ -121,6 +127,21 @@ def binary(dim):
 
     return BHpos, BHvel
 
+def calc_Periapse(Beta, R_T):
+    Beta = np.float(Beta)
+    R_T = np.float(R_T)
+    return R_T/Beta
+
+def calc_Apoapse(Beta, R_T, ecc):
+    Beta = np.float(Beta)
+    R_T = np.float(R_T)
+    ecc = np.float(ecc)
+
+    R_P = calc_Periapse(Beta, R_T)
+    fac = R_P/(1-ecc)
+
+    return fac*(1+ecc), fac
+
 
 
 if __name__ == '__main__':
@@ -128,14 +149,14 @@ if __name__ == '__main__':
     b = 0
     rmin = 5
     rmax = 20
-    R = 0.1
-    ecc = 0.9
+    R = 1
+    ecc = 0.0
     x0 = 0
     y0 = 0
     z0 = 0
 
     #points = init_disk(3, n, rmin, rmax, np.pi/6.)[0]
-    points = init_star(3,n,R,ecc)[0]
+    points = init_star(3,n,R,ecc, .01)[0]
     x = points[:,0] + x0
     y = points[:,1] + y0
     z = points[:,2] + z0
