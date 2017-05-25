@@ -197,15 +197,15 @@ def dumpAcc(acc, step):
     return
 if __name__ == '__main__':
     dim = 3
-    nobj = 1000
+    nobj = 5000
 
-    steps = 500000
+    steps = 2000000
     dt = 0.01
 
     R=1                         #star radius
     f = .5                     #r_star = f*r_schw
     q = 100                     #(M_BH/M_star)^(1/3)
-    beta = 11.6              #Inverse impact parameter: r_t/r_p
+    beta = 11.              #Inverse impact parameter: r_t/r_p
     ecc = 0.9                  #Eccentricity
 
     r_g = 0.5/f                 #r_g = M_BH

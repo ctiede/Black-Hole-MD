@@ -52,6 +52,19 @@ def compute_Fbin(dim, nobj, BHpos, pos0, vel0):
 
     return -0.5*dist1/r1[:,None]**3 - 0.5*dist2/r2[:,None]**3
 
+def compute_PWbin(dim, nobj, BHpos, pos0, vel0):
+    pos = np.copy(pos0)
+    bh1 = BHpos[0]
+    bh2 = BHpos[1]
+    r_s = 0.1
+
+    dist1 = pos - bh1
+    dist2 = pos - bh2
+    r1 = np.sqrt(np.sum(dist1**2, axis=1))
+    r2 = np.sqrt(np.sum(dist2**2, axis=1))
+
+    return -0.5*dist1/((r1[:,None]-r_s)**2 * r1[:,None]) - 0.5*dist2/((r2[:,None]-r_s)**2 * r2[:,None])
+
 def computeBin(dim, pos0, vel0):
     pos = np.copy(pos0)
     r = np.sqrt(np.sum(pos**2,axis=1))
@@ -157,13 +170,13 @@ def dump_BH(BHpos, step):
 
 if __name__ == '__main__':
     dim = 3
-    nobj = 2000
-    steps = 10000000
+    nobj = 5000
+    steps = 10**(8)
     dt = 0.01
 
     rmin = 2
     rmax = 20
-    theta = np.pi/4.
+    theta = 0.0 #np.pi/4.
     fileName = 'test_binDisk.xyz'
     pos, vel = init.init_disk(dim, nobj, rmin, rmax, theta)
 
